@@ -1,5 +1,6 @@
 workspace "Vulkan_SA"
 	architecture "x64"
+
 	configurations {
 		"DebugX64",
 		"ReleaseX64"
@@ -7,18 +8,18 @@ workspace "Vulkan_SA"
 
 VULKAN_SDK = os.getenv("Vulkan_SDK")
 
-outdir = "%{cfg.buildcfg}_%{cfg.system}"
+outdir = "%{cfg.system}_%{cfg.buildcfg}"
 
 IncludeDir = {}
-IncludeDir["GLFW"] = "Vulkan_Simple_Application/third_party/glfw"
+IncludeDir["GLFW"] = "%{prj.name}/third_party/glfw"
 
 project "Vulkan_Simple_Application"
 	location "Vulkan_Simple_Application"
 	kind "ConsoleApp"
 	cppdialect "C++17"
 
-	targetdir ("binaries/" .. outdir .. "/%{prj.name}")
-	objdir ("intermediation/" .. outdir .. "/%{prj.name}")
+	targetdir ("binaries/" .. outdir)
+	objdir ("intermediation/" .. outdir)
 
 	files
 	{
