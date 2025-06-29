@@ -1,0 +1,10 @@
+# Folder
+.vs
+binaries
+intermediation
+
+# File
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
