@@ -67,6 +67,7 @@ private:
 		createInstance();
 		setupDebugMessenger();
 		pickPhysicalDevice();
+		createLogicalDevice();
 	}
 
 	void mainLoop()
@@ -79,6 +80,8 @@ private:
 
 	void cleanup()
 	{
+		vkDestroyDevice(device, nullptr);
+
 		if (enableValidationLayers)
 			DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 
@@ -155,6 +158,9 @@ private:
 
 	void pickPhysicalDevice()
 	{
+		/**
+		* 使用 Vulkan 自带函数，检索支持 Vulkan 的物理设备
+		*/
 		uint32_t deviceCount = 0;
 		vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
 
@@ -175,6 +181,45 @@ private:
 
 		if (physicalDevive == VK_NULL_HANDLE)
 			throw std::runtime_error("failed to find a suitable GPU!");
+	}
+
+	void createLogicalDevice()
+	{
+		QueueFamilyIndices indices = findQueueFamilies(physicalDevive);
+
+		/**
+		* 接下来的结构用于描述我们想要的单个系列的队列数量
+		*/
+		VkDeviceQueueCreateInfo queueCreateInfo{};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+		queueCreateInfo.queueCount = 1;
+		
+		/**
+		* Vulkan 允许使用浮点(0.0~1.0)给队列分配优先级，从而影响命令缓冲区执行时的计划，
+		* 设置优先级是必要的，即使使用的是单一队列
+		*/
+		float queuePriority = 1.0f;
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+
+		/**
+		* 指定需要的设备功能集
+		*/
+		VkPhysicalDeviceFeatures deviceFeatures{};
+
+		VkDeviceCreateInfo deviceCreateInfo{};
+		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
+		deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
+		deviceCreateInfo.queueCreateInfoCount = 1;
+		
+		deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
+		deviceCreateInfo.enabledExtensionCount = 0;
+
+		if (vkCreateDevice(physicalDevive, &deviceCreateInfo, nullptr, &device) != VK_SUCCESS)
+			throw std::runtime_error("failed to create logical device!");
+
+		vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
 	}
 
 /**
@@ -304,6 +349,8 @@ private:
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
 	VkPhysicalDevice physicalDevive = VK_NULL_HANDLE;
+	VkDevice device;
+	VkQueue graphicsQueue;
 
 };
 
