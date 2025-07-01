@@ -4,6 +4,7 @@
 
 #include <string>
 #include <vector>
+#include <set>
 
 #include <optional>
 
@@ -30,10 +31,11 @@ const std::vector<const char*> validationLayers = {
 struct QueueFamilyIndices
 {
 	std::optional<uint32_t> graphicsFamily;
+	std::optional<uint32_t> presentFamily;
 
 	bool isComplete()
 	{
-		return graphicsFamily.has_value();
+		return graphicsFamily.has_value() && presentFamily.has_value();
 	}
 };
 
@@ -66,6 +68,7 @@ private:
 	{
 		createInstance();
 		setupDebugMessenger();
+		createSurface();
 		pickPhysicalDevice();
 		createLogicalDevice();
 	}
@@ -85,6 +88,7 @@ private:
 		if (enableValidationLayers)
 			DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 
+		vkDestroySurfaceKHR(instance, surface, nullptr);
 		vkDestroyInstance(instance, nullptr);
 
 		glfwDestroyWindow(window);
@@ -145,6 +149,17 @@ private:
 			throw std::runtime_error("failed to create instance!");
 	}
 
+	/**
+	* 因为 Vulkan 是一个与平台无关的 API , 它并不能直接的与 Window 系统进行交互。
+	* 建立 Vulkan 和 Window 系统的联系将结果渲染到当前屏幕，我们需要使用 WSI (Window System Integration)扩展
+	* 并且需要在创建 Instance 后立即创建 surface 否则会影响物理设备的选择
+	*/
+	void createSurface()
+	{
+		if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS)
+			throw std::runtime_error("failed to create window surface!");
+	}
+
 	void setupDebugMessenger()
 	{
 		if (!enableValidationLayers) return;
@@ -187,20 +202,31 @@ private:
 	{
 		QueueFamilyIndices indices = findQueueFamilies(physicalDevive);
 
-		/**
-		* 接下来的结构用于描述我们想要的单个系列的队列数量
-		*/
-		VkDeviceQueueCreateInfo queueCreateInfo{};
-		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
-		queueCreateInfo.queueCount = 1;
-		
-		/**
-		* Vulkan 允许使用浮点(0.0~1.0)给队列分配优先级，从而影响命令缓冲区执行时的计划，
-		* 设置优先级是必要的，即使使用的是单一队列
-		*/
+		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+		std::set<uint32_t> uniqueQueueFamilies = {
+			indices.graphicsFamily.value(),
+			indices.presentFamily.value()
+		};
+ 
 		float queuePriority = 1.0f;
-		queueCreateInfo.pQueuePriorities = &queuePriority;
+		for (uint32_t queueFamily : uniqueQueueFamilies)
+		{
+			/**
+			* 接下来的结构用于描述我们想要的单个系列的队列数量
+			*/
+			VkDeviceQueueCreateInfo queueCreateInfo{};
+			queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+			queueCreateInfo.queueFamilyIndex = queueFamily;
+			queueCreateInfo.queueCount = 1;
+
+			/**
+			* Vulkan 允许使用浮点(0.0~1.0)给队列分配优先级，从而影响命令缓冲区执行时的计划，
+			* 设置优先级是必要的，即使使用的是单一队列
+			*/
+			
+			queueCreateInfo.pQueuePriorities = &queuePriority;
+			queueCreateInfos.push_back(queueCreateInfo);
+		}
 
 		/**
 		* 指定需要的设备功能集
@@ -210,8 +236,8 @@ private:
 		VkDeviceCreateInfo deviceCreateInfo{};
 		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
-		deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
-		deviceCreateInfo.queueCreateInfoCount = 1;
+		deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
+		deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
 		
 		deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 		deviceCreateInfo.enabledExtensionCount = 0;
@@ -220,6 +246,7 @@ private:
 			throw std::runtime_error("failed to create logical device!");
 
 		vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
+		vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 	}
 
 /**
@@ -254,6 +281,15 @@ private:
 		{
 			if (queueFmaily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
 				indices.graphicsFamily = i;
+
+			/**
+			*  查找能够呈现到窗口的队列系列
+			*/
+			VkBool32 presentSupport = false;
+			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+
+			if (presentSupport)
+				indices.presentFamily = i;
 
 			if (indices.isComplete())
 				break;
@@ -351,6 +387,8 @@ private:
 	VkPhysicalDevice physicalDevive = VK_NULL_HANDLE;
 	VkDevice device;
 	VkQueue graphicsQueue;
+	VkQueue presentQueue;
+	VkSurfaceKHR surface;
 
 };
 
