@@ -8,7 +8,7 @@ workspace "Vulkan_SA"
 
 VULKAN_SDK = os.getenv("Vulkan_SDK")
 
-outdir = "%{cfg.system}_%{cfg.buildcfg}"
+outdir = "%{cfg.buildcfg}"
 
 IncludeDir = {}
 IncludeDir["GLFW"] = "%{prj.name}/third_party/glfw"
